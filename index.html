@@ -30,7 +30,7 @@ body{margin:0}
 :root[data-theme="dark"]{
   --bg:#0f1218; --surface:#181c25; --fg:#eef0f4; --muted:#9aa1ae; --line:#2a303c;
   --red:#e8566a; --blue:#5b93d6; --free:#7d8492; color-scheme:dark}
-html,body{height:100%}
+html,body{height:100%;touch-action:manipulation}
 body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px}
 .app{max-width:440px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;gap:22px;
   padding-block:28px 24px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));box-sizing:border-box}
@@ -49,16 +49,21 @@ li{background:var(--surface);border:1px solid var(--line);border-radius:16px;pad
 .p{font-family:var(--display);font-weight:600;font-size:15px;color:var(--muted)}
 .cls{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.2;min-width:0}
 .blk{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.time{display:block;margin-top:3px;font-family:var(--body);font-weight:500;font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 li.free .cls{color:var(--free);font-weight:600}
 li.free{background:transparent;border-style:dashed}
 .msg{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;line-height:1.5;color:var(--muted)}
 nav{margin-top:auto;display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center}
 button{font:inherit;font-weight:600;font-size:15px;color:var(--fg);background:var(--surface);border:1px solid var(--line);
   border-radius:12px;padding:12px 14px;cursor:pointer}
+button{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 button:disabled{opacity:.35;cursor:default}
 button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 #today{color:var(--blue)}
 #today[hidden]{display:block!important;visibility:hidden}
+#lunch{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+.mi{display:flex;justify-content:space-between;gap:12px;font-size:15px;line-height:1.35}
+.diet{flex:none;max-width:45%;text-align:right;font-size:12px;color:var(--muted)}
 .foot{font-size:12px;color:var(--muted);text-align:center;line-height:1.5}
 </style>
 </head>
@@ -73,6 +78,7 @@ button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
     </div>
   </header>
   <ol id="list"></ol>
+  <section id="lunch" hidden></section>
   <nav>
     <button id="prev" aria-label="Previous school day">‹ Prev</button>
     <button id="today">Today</button>
@@ -90,6 +96,16 @@ const LETTERS = "ABCDEFGH";
 const OFF = new Set(["2026-09-07","2026-09-25","2026-10-12","2026-10-13","2026-10-14","2026-10-15","2026-10-16",
   "2026-11-02","2026-11-20","2026-11-26","2026-11-27"]);
 const START = "2026-08-06", END = "2026-12-15";
+// Period times from the Upper School bell schedule 2026-27. Wednesday is shorter.
+const TIMES = ["8:30–9:50","10:00–11:20","12:40–14:00","14:10–15:30"];
+const TIMES_WED = ["8:30–9:45","9:55–11:10","12:20–13:35","13:45–15:00"];
+// Lunch menu by date: [item, dietary labels]. Source: Graded weekly menu. All items are nut-free.
+const MENU = {
+"2026-11-16":[["Beans soup","Vegetarian, LF"],["Skirt Steak BBQ","LF"],["Farofa","Vegan, GF, LF"],["Sauteed kale","Vegan, GF, LF"],["Couscous stuffed tomatoes","Vegetarian, GF"],["Potato and mayo salad","Vegetarian, GF"],["Rice and beans","Vegan, GF, LF"],["Salad",""],["Fruit","Vegan, GF, LF"]],
+"2026-11-17":[["Vegetables soup","Vegetarian, GF"],["Chicken with pizza sauce","GF"],["Beef strips","LF"],["Broccoli","Vegan, GF, LF"],["Rice and beans","Vegan, GF, LF"],["Salad",""],["Fruit","Vegan, GF, LF"],["Apple crumble","Vegan, LF"]],
+"2026-11-18":[["Chicken soup","GF"],["Mac n' cheese","Vegetarian"],["Tomato sauce","Vegan, GF, LF"],["Beef strips","LF"],["Steamed broccoli","Vegan, GF, LF"],["Rice and beans","Vegan, GF, LF"],["Salad",""],["Fruit","Vegan, GF, LF"]],
+"2026-11-19":[["Cheeseburger",""],["Grilled chicken","LF"],["Potato chips","Vegan, GF, LF"],["Quinoa burger","Vegan, GF, LF"],["Rice and beans","Vegan, GF, LF"],["Salad",""],["Fruit","Vegan, GF, LF"]]
+};
 
 const key = d => d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const fromKey = k => { const [y,m,d] = k.split("-").map(Number); return new Date(y, m-1, d, 12); };
@@ -113,6 +129,7 @@ const fmt = (k, o) => fromKey(k).toLocaleDateString("en-US", o);
 
 function render(){
   const list = $("list"); list.innerHTML = "";
+  $("lunch").hidden = true;
   if (idx >= DAYS.length) {
     $("badge").textContent = "–"; $("badge").className = "badge none";
     $("tag").textContent = "Semester over";
@@ -131,9 +148,15 @@ function render(){
     ROTATION[day.letter].forEach((b, i) => {
       const li = document.createElement("li");
       if (b === 1) li.className = "free";
-      li.innerHTML = `<span class="p">P${i+1}</span><span class="cls">${CLASSES[b]}</span><span class="blk">Block ${b}</span>`;
+      const t = (fromKey(day.k).getDay() === 3 ? TIMES_WED : TIMES)[i];
+      li.innerHTML = `<span class="p">P${i+1}</span><span class="cls">${CLASSES[b]}<span class="time">${t}</span></span><span class="blk">Block ${b}</span>`;
       list.appendChild(li);
     });
+    const m = MENU[day.k];
+    if (m) {
+      $("lunch").hidden = false;
+      $("lunch").innerHTML = '<div class="tag">Lunch</div>' + m.map(([n,t]) => `<div class="mi"><span>${n}</span>${t ? `<span class="diet">${t}</span>` : ""}</div>`).join("");
+    }
   }
   $("prev").disabled = idx <= 0;
   $("next").disabled = idx >= DAYS.length - 1;
