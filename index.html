@@ -61,7 +61,14 @@ button:disabled{opacity:.35;cursor:default}
 button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 #today{color:var(--blue)}
 #today[hidden]{display:block!important;visibility:hidden}
-#lunch{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:flex;flex-direction:column;gap:8px}
+[hidden]{display:none!important}
+#lunchBtn{width:100%;color:var(--blue)}
+#sheet{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+.panel{background:var(--bg);width:100%;max-width:440px;max-height:80vh;overflow:auto;border-radius:20px 20px 0 0;border:1px solid var(--line);
+  padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px))}
+.sheethead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+#sheetTitle{font-family:var(--display);font-weight:600;font-size:20px;line-height:1.2}
+#lunch{display:flex;flex-direction:column;gap:8px}
 .mi{display:flex;justify-content:space-between;gap:12px;font-size:15px;line-height:1.35}
 .diet{flex:none;max-width:45%;text-align:right;font-size:12px;color:var(--muted)}
 .foot{font-size:12px;color:var(--muted);text-align:center;line-height:1.5}
@@ -78,13 +85,20 @@ button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
     </div>
   </header>
   <ol id="list"></ol>
-  <section id="lunch" hidden></section>
+  <button id="lunchBtn" hidden>Lunch menu</button>
   <nav>
     <button id="prev" aria-label="Previous school day">‹ Prev</button>
     <button id="today">Today</button>
     <button id="next" aria-label="Next school day">Next ›</button>
   </nav>
   <p class="foot" id="foot">Graded HS · Fall 2026 · Aug 6 to Dec 15</p>
+</div>
+
+<div id="sheet" hidden>
+  <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="sheethead"><span id="sheetTitle"></span><button id="sheetClose">Close</button></div>
+    <div id="lunch"></div>
+  </div>
 </div>
 
 <script>
@@ -129,7 +143,7 @@ const fmt = (k, o) => fromKey(k).toLocaleDateString("en-US", o);
 
 function render(){
   const list = $("list"); list.innerHTML = "";
-  $("lunch").hidden = true;
+  $("lunchBtn").hidden = true;
   if (idx >= DAYS.length) {
     $("badge").textContent = "–"; $("badge").className = "badge none";
     $("tag").textContent = "Semester over";
@@ -154,8 +168,9 @@ function render(){
     });
     const m = MENU[day.k];
     if (m) {
-      $("lunch").hidden = false;
-      $("lunch").innerHTML = '<div class="tag">Lunch</div>' + m.map(([n,t]) => `<div class="mi"><span>${n}</span>${t ? `<span class="diet">${t}</span>` : ""}</div>`).join("");
+      $("lunchBtn").hidden = false;
+      $("sheetTitle").textContent = "Lunch · " + fmt(day.k, {weekday:"long", month:"short", day:"numeric"});
+      $("lunch").innerHTML = m.map(([n,t]) => `<div class="mi"><span>${n}</span>${t ? `<span class="diet">${t}</span>` : ""}</div>`).join("");
     }
   }
   $("prev").disabled = idx <= 0;
@@ -167,6 +182,11 @@ $("next").onclick = () => { if (idx < DAYS.length - 1) { idx++; render(); } };
 $("today").onclick = () => { idx = defaultIndex(); render(); };
 document.addEventListener("visibilitychange", () => { if (!document.hidden) { todayKey = key(new Date()); idx = defaultIndex(); render(); } });
 render();
+const sheet = $("sheet");
+$("lunchBtn").onclick = () => { sheet.hidden = false; };
+$("sheetClose").onclick = () => { sheet.hidden = true; };
+sheet.onclick = e => { if (e.target === sheet) sheet.hidden = true; };
+document.addEventListener("keydown", e => { if (e.key === "Escape") sheet.hidden = true; });
 </script>
 </body>
 </html>
