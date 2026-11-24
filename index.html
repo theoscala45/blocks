@@ -58,7 +58,7 @@ button{font:inherit;font-weight:600;font-size:15px;color:var(--fg);background:va
   border-radius:12px;padding:12px 14px;cursor:pointer}
 button{touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
 button{transition:transform .12s ease-out,background-color .15s ease-out,border-color .15s ease-out}
-button:active:not(:disabled){transform:scale(.96)}
+button:active:not(:disabled),button.pressed:not(:disabled){transform:scale(.94)}
 @media (hover:hover){button:hover:not(:disabled){border-color:var(--muted)}}
 button:disabled{opacity:.35;cursor:default}
 button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
@@ -216,6 +216,20 @@ $("lunchBtn").onclick = openSheet;
 $("sheetClose").onclick = closeSheet;
 sheet.onclick = e => { if (e.target === sheet) closeSheet(); };
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+// Press effect: iPhone Safari often skips :active on quick taps, so add a class on touch
+// and keep it for at least 140ms so the shrink is visible.
+document.addEventListener("pointerdown", e => {
+  const b = e.target.closest("button");
+  if (!b || b.disabled) return;
+  const start = Date.now();
+  b.classList.add("pressed");
+  const up = () => {
+    ["pointerup","pointercancel","pointerleave"].forEach(t => b.removeEventListener(t, up));
+    setTimeout(() => b.classList.remove("pressed"), Math.max(0, 140 - (Date.now() - start)));
+  };
+  ["pointerup","pointercancel","pointerleave"].forEach(t => b.addEventListener(t, up));
+}, {passive:true});
+document.addEventListener("touchstart", () => {}, {passive:true});
 </script>
 </body>
 </html>
